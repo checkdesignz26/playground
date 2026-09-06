@@ -108,7 +108,7 @@ canvas{position:absolute;left:50%;top:50%;transform-origin:center center;touch-a
       <button class="btn mini template-btn" data-tpl="diamondFrame">Diamond Frame</button>
       <button class="btn mini template-btn" data-tpl="scattered">Scattered</button>
       <button class="btn mini template-btn" data-tpl="dotGrid">Dot Grid</button>
-    </div><button id="templateClear" class="btn mini danger" style="width:100%;margin-top:8px">✕ Clear Template</button><div class="hint">Pick a layout, then tap a motif below to drop it into the next empty slot - bigger (hero) slots take your focal motifs, smaller (accent/filler) slots take details, same idea as a Magic Builder template.</div></section>
+    </div><label class="upload accentPurple" style="margin-top:8px">📥 Import Template from Magic Builder<input id="templateImportInput" type="file" accept="application/json,.json" style="display:none"></label><button id="templateClear" class="btn mini danger" style="width:100%;margin-top:8px">✕ Clear Template</button><div class="hint">Pick a layout above, or import a template's layout exported from Magic Builder ("export for playground"), then tap a motif below to drop it into the next empty slot - bigger (hero) slots take your focal motifs, smaller (accent/filler) slots take details.</div></section>
     <section class="section"><div class="section-title">🖼️ Motif Tray</div><div id="motifTray" class="motif-tray"></div><div id="motifEmpty" class="hint">Captured drawings and uploaded motifs appear here.</div></section>
     <section class="section"><div class="section-title">📚 Trace Reference</div><label class="upload accentTeal">➕ Trace Artwork<input id="traceInput" type="file" accept="image/*" multiple style="display:none"></label><div id="traceList" class="trace-list" style="margin-top:8px"></div><div class="slider-row"><label>Opacity</label><input id="traceOpacity" type="range" min="5" max="100" value="35"><span id="traceOpacityVal">35%</span></div><div class="slider-row"><label>Scale</label><input id="traceScale" type="range" min="20" max="400" value="100"><span id="traceScaleVal">100%</span></div><div class="row"><button id="traceFit" class="btn mini">Fit</button><button id="traceCentre" class="btn mini">Centre</button><button id="traceLock" class="btn mini active">🔒 Locked</button><button id="traceClear" class="btn mini danger">Clear</button></div></section>
     <section class="section"><div class="section-title">✏️ Draw</div><div class="mode-switch"><button id="drawModeBtn" class="btn active">✏️ Draw</button><button id="editModeBtn" class="btn">↔️ Edit</button></div><div class="grid" style="margin-top:10px"><button class="brush-btn active" data-brush="fine">Fine Line</button><button class="brush-btn" data-brush="mono">Monoline</button><button class="brush-btn" data-brush="eraser">Eraser</button></div><div class="slider-row"><label>Size</label><input id="brushSize" type="range" min="0.5" max="18" step="0.1" value="2.2"><span id="brushSizeVal">2.2</span></div><div class="row"><input id="brushColor" class="color" type="color" value="#000000"><button id="captureBtn" class="btn primary" style="flex:1">✂️ Capture Motif</button></div><div class="section-title" style="margin-top:14px">🖌️ Brush Studio</div><div class="brush-preview"><div id="brushDot" class="brush-dot"></div></div><div class="slider-row"><label>Opacity</label><input id="brushOpacity" type="range" min="5" max="100" value="100"><span id="brushOpacityVal">100%</span></div><div class="slider-row"><label>Spacing</label><input id="brushSpacing" type="range" min="1" max="40" value="1"><span id="brushSpacingVal">1</span></div><div class="slider-row"><label>Smooth</label><input id="brushSmooth" type="range" min="0" max="90" value="20"><span id="brushSmoothVal">20%</span></div><div class="row"><button id="saveBrush" class="btn mini primary">💾 Save Brush</button><button id="resetBrush" class="btn mini">Reset</button></div><div id="savedBrushes" class="grid" style="margin-top:8px"></div><div class="hint">Apple Pencil draws. One finger no longer pans while drawing. Use two fingers to pan, pinch and rotate.</div></section>
@@ -191,16 +191,32 @@ const TEMPLATES={
   {type:'circle',x:70,y:80,w:10,h:10,role:'filler'}]}
 };
 let activeTemplate=null;
-function applyTemplate(key){
- placed=TEMPLATES[key].bricks.map(b=>{const w=(b.w/100)*TILE,h=(b.h/100)*TILE;
-  return {id:crypto.randomUUID(),motifIndex:null,img:null,slotShape:b.type,role:b.role,
+// Shared by the 5 built-in templates AND an imported Magic Builder layout - a brick only needs
+// x/y/w/h/role (0-100 percentages) plus optional rot/shape. Built-in TEMPLATES use `type` for
+// the outline shape; an imported Magic Builder export uses `shape` - both are read here.
+function applyBricks(bricksArr,name,key){
+ placed=(bricksArr||[]).map(b=>{const w=(b.w/100)*TILE,h=(b.h/100)*TILE;
+  return {id:crypto.randomUUID(),motifIndex:null,img:null,slotShape:b.shape||b.type||'oval',role:b.role||'filler',
    x:C+(b.x/100)*TILE,y:C+(b.y/100)*TILE,w,h,boxW:w,boxH:h,s:1,r:b.rot||0,fx:1,fy:1};});
- selected=placed[0]?.id||null;activeTemplate=key;mode='edit';syncMode();syncTemplateUI();pushHist();redraw();
- setStatus('📐 '+TEMPLATES[key].name+' template loaded - tap a motif to fill the next slot.');
+ selected=placed[0]?.id||null;activeTemplate=key||null;mode='edit';syncMode();syncTemplateUI();pushHist();redraw();
+ setStatus('📐 '+(name||'Template')+' loaded - tap a motif to fill the next slot.');
 }
+function applyTemplate(key){applyBricks(TEMPLATES[key].bricks,TEMPLATES[key].name,key);}
 function syncTemplateUI(){document.querySelectorAll('.template-btn').forEach(b=>b.classList.toggle('active',b.dataset.tpl===activeTemplate));}
 document.querySelectorAll('.template-btn').forEach(b=>b.onclick=()=>applyTemplate(b.dataset.tpl));
 $('templateClear').onclick=()=>{pushHist();placed=[];selected=null;activeTemplate=null;syncTemplateUI();redraw();};
+$('templateImportInput').onchange=e=>{
+ const f=e.target.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=ev=>{
+  try{
+   const data=JSON.parse(ev.target.result);
+   if(!Array.isArray(data.bricks)||!data.bricks.length)throw new Error('no bricks in file');
+   applyBricks(data.bricks,data.name||f.name.replace(/\.json$/i,''),null);
+  }catch(err){setStatus('⚠️ Could not read that as a Magic Builder template - use its "export for playground" button to make one.');}
+ };
+ r.readAsText(f);e.target.value='';
+};
 // Fills the selected empty slot if there is one, else the first remaining empty slot, else
 // (no template active, or all slots filled) falls back to a plain free-placed motif.
 function placeMotif(motifIdx,img){
