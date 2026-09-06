@@ -102,6 +102,13 @@ canvas{position:absolute;left:50%;top:50%;transform-origin:center center;touch-a
   <aside class="sidebar">
     <label class="upload accentPurple">📸 Add Motifs<input id="motifInput" type="file" accept="image/*" multiple style="display:none"></label>
     <section class="section"><div class="section-title">🧱 Background Pattern</div><label class="upload accentBg">🖼️ Load as Background<input id="bgInput" type="file" accept="image/*" style="display:none"></label><div id="bgEmpty" class="hint">Load a tile from Magic Builder (or any square pattern) as the base — it tiles with the same repeat layout, sits under your drawing and motifs, and is included in export.</div><div id="bgControls" style="display:none"><div class="slider-row"><label>Opacity</label><input id="bgOpacitySlider" type="range" min="0" max="100" value="100"><span id="bgOpacityVal">100%</span></div><div class="row"><button id="bgToggle" class="btn mini active">👁️ Shown</button><button id="bgClear" class="btn mini danger">Clear</button></div></div></section>
+    <section class="section"><div class="section-title">📐 Templates</div><div class="grid">
+      <button class="btn mini template-btn" data-tpl="fourCorners">Four Corners</button>
+      <button class="btn mini template-btn" data-tpl="focalPoint">Focal Point</button>
+      <button class="btn mini template-btn" data-tpl="diamondFrame">Diamond Frame</button>
+      <button class="btn mini template-btn" data-tpl="scattered">Scattered</button>
+      <button class="btn mini template-btn" data-tpl="dotGrid">Dot Grid</button>
+    </div><button id="templateClear" class="btn mini danger" style="width:100%;margin-top:8px">✕ Clear Template</button><div class="hint">Pick a layout, then tap a motif below to drop it into the next empty slot - bigger (hero) slots take your focal motifs, smaller (accent/filler) slots take details, same idea as a Magic Builder template.</div></section>
     <section class="section"><div class="section-title">🖼️ Motif Tray</div><div id="motifTray" class="motif-tray"></div><div id="motifEmpty" class="hint">Captured drawings and uploaded motifs appear here.</div></section>
     <section class="section"><div class="section-title">📚 Trace Reference</div><label class="upload accentTeal">➕ Trace Artwork<input id="traceInput" type="file" accept="image/*" multiple style="display:none"></label><div id="traceList" class="trace-list" style="margin-top:8px"></div><div class="slider-row"><label>Opacity</label><input id="traceOpacity" type="range" min="5" max="100" value="35"><span id="traceOpacityVal">35%</span></div><div class="slider-row"><label>Scale</label><input id="traceScale" type="range" min="20" max="400" value="100"><span id="traceScaleVal">100%</span></div><div class="row"><button id="traceFit" class="btn mini">Fit</button><button id="traceCentre" class="btn mini">Centre</button><button id="traceLock" class="btn mini active">🔒 Locked</button><button id="traceClear" class="btn mini danger">Clear</button></div></section>
     <section class="section"><div class="section-title">✏️ Draw</div><div class="mode-switch"><button id="drawModeBtn" class="btn active">✏️ Draw</button><button id="editModeBtn" class="btn">↔️ Edit</button></div><div class="grid" style="margin-top:10px"><button class="brush-btn active" data-brush="fine">Fine Line</button><button class="brush-btn" data-brush="mono">Monoline</button><button class="brush-btn" data-brush="eraser">Eraser</button></div><div class="slider-row"><label>Size</label><input id="brushSize" type="range" min="0.5" max="18" step="0.1" value="2.2"><span id="brushSizeVal">2.2</span></div><div class="row"><input id="brushColor" class="color" type="color" value="#000000"><button id="captureBtn" class="btn primary" style="flex:1">✂️ Capture Motif</button></div><div class="section-title" style="margin-top:14px">🖌️ Brush Studio</div><div class="brush-preview"><div id="brushDot" class="brush-dot"></div></div><div class="slider-row"><label>Opacity</label><input id="brushOpacity" type="range" min="5" max="100" value="100"><span id="brushOpacityVal">100%</span></div><div class="slider-row"><label>Spacing</label><input id="brushSpacing" type="range" min="1" max="40" value="1"><span id="brushSpacingVal">1</span></div><div class="slider-row"><label>Smooth</label><input id="brushSmooth" type="range" min="0" max="90" value="20"><span id="brushSmoothVal">20%</span></div><div class="row"><button id="saveBrush" class="btn mini primary">💾 Save Brush</button><button id="resetBrush" class="btn mini">Reset</button></div><div id="savedBrushes" class="grid" style="margin-top:8px"></div><div class="hint">Apple Pencil draws. One finger no longer pans while drawing. Use two fingers to pan, pinch and rotate.</div></section>
@@ -142,8 +149,71 @@ function drawGuides(){ctx.save();ctx.strokeStyle='rgba(54,60,110,.18)';ctx.lineW
 function drawTraces(){traces.forEach(t=>{ctx.save();ctx.globalAlpha=t.opacity;t.w=t.img.width*t.scale;t.h=t.img.height*t.scale;ctx.drawImage(t.img,t.x-t.w/2,t.y-t.h/2,t.w,t.h);ctx.restore();});}
 function offsets(){let arr=[[0,0]];if(!showTiling)return arr;for(let ix=-1;ix<=1;ix++)for(let iy=-1;iy<=1;iy++){let ox=ix*TILE,oy=iy*TILE;if(layout==='halfDrop'&&ix%2)oy+=TILE/2;if(layout==='halfBrick'&&iy%2)ox+=TILE/2;if(layout==='diamond'){ox+=iy*TILE/2}if(!(ix===0&&iy===0))arr.push([ox,oy]);}return arr;}
 function drawTiles(){offsets().forEach(([ox,oy])=>ctx.drawImage(drawLayer,ox,oy));}
-function drawPlaced(){placed.forEach(p=>{if(!p.img)return;offsets().forEach(([ox,oy])=>drawOne(p,ox,oy));});}
+function drawPlaced(){placed.forEach(p=>{offsets().forEach(([ox,oy])=>{if(p.img)drawOne(p,ox,oy);else drawEmptySlot(p,ox,oy);});});}
 function drawOne(p,ox=0,oy=0){ctx.save();ctx.translate(p.x+ox,p.y+oy);ctx.rotate(p.r*Math.PI/180);ctx.scale(p.s*p.fx,p.s*p.fy);ctx.drawImage(p.img,-p.w/2,-p.h/2,p.w,p.h);ctx.restore();}
+// An unfilled Template slot: a dashed placeholder shape (same idea as Magic Builder's blank
+// skeleton bricks) showing where a motif will land and roughly how big ("hero" slots are the
+// biggest, "accent"/"filler" the smallest) - purely an editing aid, never exported.
+function drawEmptySlot(p,ox=0,oy=0){
+ const w=p.boxW||p.w,h=p.boxH||p.h;
+ ctx.save();ctx.translate(p.x+ox,p.y+oy);ctx.rotate(p.r*Math.PI/180);
+ ctx.strokeStyle='rgba(255,142,214,.7)';ctx.lineWidth=3;ctx.setLineDash([10,7]);
+ ctx.beginPath();
+ if(p.slotShape==='diamond'){ctx.moveTo(0,-h/2);ctx.lineTo(w/2,0);ctx.lineTo(0,h/2);ctx.lineTo(-w/2,0);ctx.closePath();}
+ else{ctx.ellipse(0,0,w/2,h/2,0,0,Math.PI*2);}
+ ctx.stroke();
+ if(p.role){ctx.setLineDash([]);ctx.fillStyle='rgba(180,90,140,.6)';ctx.font=Math.max(11,Math.min(w,h)*0.16)+'px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(p.role,0,0);}
+ ctx.restore();
+}
+// Templates: pre-arranged slot layouts ported from Magic Builder's skeleton presets (same
+// x/y/w/h percentages and hero/secondary/accent/filler size hierarchy) - pick a layout, then
+// tap a motif in the tray to drop it into the next empty slot instead of placing everything by
+// hand one at a time.
+const TEMPLATES={
+ fourCorners:{name:'Four Corners',bricks:[
+  {type:'oval',x:25,y:25,w:20,h:13,role:'hero'},{type:'oval',x:75,y:25,w:20,h:13,role:'hero'},
+  {type:'oval',x:25,y:75,w:20,h:13,role:'secondary'},{type:'oval',x:75,y:75,w:20,h:13,role:'secondary'}]},
+ focalPoint:{name:'Focal Point',bricks:[
+  {type:'oval',x:50,y:20,w:24,h:15,role:'hero'},{type:'oval',x:20,y:50,w:20,h:13,role:'secondary'},
+  {type:'oval',x:80,y:50,w:20,h:13,role:'secondary'},{type:'circle',x:50,y:80,w:10,h:10,role:'filler'}]},
+ diamondFrame:{name:'Diamond Frame',bricks:[
+  {type:'oval',x:50,y:0,w:22,h:16,role:'hero'},{type:'oval',x:50,y:100,w:22,h:16,role:'hero'},
+  {type:'oval',x:0,y:50,w:16,h:22,role:'secondary'},{type:'oval',x:100,y:50,w:16,h:22,role:'secondary'},
+  {type:'circle',x:50,y:50,w:12,h:12,role:'filler'},{type:'circle',x:0,y:0,w:10,h:10,role:'accent'},
+  {type:'circle',x:100,y:0,w:10,h:10,role:'accent'},{type:'circle',x:0,y:100,w:10,h:10,role:'accent'},
+  {type:'circle',x:100,y:100,w:10,h:10,role:'accent'}]},
+ scattered:{name:'Scattered',bricks:[
+  {type:'oval',x:30,y:24,w:22,h:14,role:'hero',rot:-20},{type:'oval',x:72,y:30,w:18,h:12,role:'secondary',rot:35},
+  {type:'diamond',x:38,y:68,w:13,h:13,role:'filler',rot:15},{type:'circle',x:78,y:78,w:10,h:10,role:'accent'}]},
+ dotGrid:{name:'Dot Grid',bricks:[
+  {type:'circle',x:20,y:20,w:10,h:10,role:'filler'},{type:'circle',x:70,y:20,w:10,h:10,role:'filler'},
+  {type:'circle',x:45,y:50,w:10,h:10,role:'filler'},{type:'circle',x:20,y:80,w:10,h:10,role:'filler'},
+  {type:'circle',x:70,y:80,w:10,h:10,role:'filler'}]}
+};
+let activeTemplate=null;
+function applyTemplate(key){
+ placed=TEMPLATES[key].bricks.map(b=>{const w=(b.w/100)*TILE,h=(b.h/100)*TILE;
+  return {id:crypto.randomUUID(),motifIndex:null,img:null,slotShape:b.type,role:b.role,
+   x:C+(b.x/100)*TILE,y:C+(b.y/100)*TILE,w,h,boxW:w,boxH:h,s:1,r:b.rot||0,fx:1,fy:1};});
+ selected=placed[0]?.id||null;activeTemplate=key;mode='edit';syncMode();syncTemplateUI();pushHist();redraw();
+ setStatus('📐 '+TEMPLATES[key].name+' template loaded - tap a motif to fill the next slot.');
+}
+function syncTemplateUI(){document.querySelectorAll('.template-btn').forEach(b=>b.classList.toggle('active',b.dataset.tpl===activeTemplate));}
+document.querySelectorAll('.template-btn').forEach(b=>b.onclick=()=>applyTemplate(b.dataset.tpl));
+$('templateClear').onclick=()=>{pushHist();placed=[];selected=null;activeTemplate=null;syncTemplateUI();redraw();};
+// Fills the selected empty slot if there is one, else the first remaining empty slot, else
+// (no template active, or all slots filled) falls back to a plain free-placed motif.
+function placeMotif(motifIdx,img){
+ let slot=placed.find(p=>p.id===selected&&!p.img)||placed.find(p=>!p.img);
+ if(slot){
+  const boxW=slot.boxW||slot.w,boxH=slot.boxH||slot.h,fit=Math.min(boxW/img.width,boxH/img.height);
+  slot.w=img.width*fit;slot.h=img.height*fit;slot.motifIndex=motifIdx;slot.img=img;selected=slot.id;
+ }else{
+  placed.push({id:crypto.randomUUID(),motifIndex:motifIdx,img,x:W/2,y:H/2,w:Math.min(320,img.width),h:Math.min(320,img.height),s:1,r:0,fx:1,fy:1});
+  selected=placed[placed.length-1].id;
+ }
+ mode='edit';syncMode();pushHist();redraw();
+}
 function strokeTo(x,y,pressure=.5){if(!last){last={x,y};return}let tx=x,ty=y;if(brushSmooth>0){tx=last.x+(x-last.x)*(1-brushSmooth);ty=last.y+(y-last.y)*(1-brushSmooth)}const pairs=symmetryPairs(last.x,last.y,tx,ty);pairs.forEach(v=>drawSegment(v[0],v[1],v[2],v[3],pressure));last={x:tx,y:ty};}
 function drawSegment(x1,y1,x2,y2,pressure=.5){dctx.save();dctx.lineCap='round';dctx.lineJoin='round';dctx.strokeStyle=brush==='eraser'?'rgba(0,0,0,1)':brushColor;dctx.globalAlpha=brush==='eraser'?1:brushOpacity;dctx.globalCompositeOperation=brush==='eraser'?'destination-out':'source-over';let sz=brush==='fine'?Math.max(.5,brushSize*(.35+pressure*.65)):brushSize;dctx.lineWidth=brush==='mono'?brushSize:sz;dctx.beginPath();dctx.moveTo(x1,y1);dctx.lineTo(x2,y2);dctx.stroke();dctx.restore();}
 function symmetryPairs(x1,y1,x2,y2){const out=[[x1,y1,x2,y2]];const vx=(x)=>2*symX-x,hy=(y)=>2*symY-y;if(symMode==='vertical'||symMode==='quad')out.push([vx(x1),y1,vx(x2),y2]);if(symMode==='horizontal'||symMode==='quad')out.push([x1,hy(y1),x2,hy(y2)]);if(symMode==='quad')out.push([vx(x1),hy(y1),vx(x2),hy(y2)]);if(symMode==='diamond'){out.push([vx(x1),y1,vx(x2),y2],[x1,hy(y1),x2,hy(y2)],[vx(x1),hy(y1),vx(x2),hy(y2)],[symX+(y1-symY),symY+(x1-symX),symX+(y2-symY),symY+(x2-symX)],[symX-(y1-symY),symY-(x1-symX),symX-(y2-symY),symY-(x2-symX)]);}return out;}
@@ -156,15 +226,15 @@ wrap.addEventListener('touchmove',e=>{e.preventDefault();if(!touchState)return;c
 wrap.addEventListener('touchend',e=>{e.preventDefault();if(!touchState)return;const dt=Date.now()-touchState.time;const tap=!touchState.moved&&dt<260;if(tap&&touchState.n===2){undo();lastTouchEnd=Date.now()}else if(tap&&touchState.n===3){redo();lastTouchEnd=Date.now()}touchState=null;}, {passive:false});
 function copyTouches(t){return Array.from(t).map(v=>({x:v.clientX,y:v.clientY}))}function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)||1}function ang(a,b){return Math.atan2(b.y-a.y,b.x-a.x)}function mid(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
 function captureMotif(){const imgData=dctx.getImageData(0,0,W,H).data;let minX=W,minY=H,maxX=0,maxY=0,found=false;for(let y=0;y<H;y+=2){for(let x=0;x<W;x+=2){if(imgData[(y*W+x)*4+3]>8){found=true;if(x<minX)minX=x;if(y<minY)minY=y;if(x>maxX)maxX=x;if(y>maxY)maxY=y;}}}if(!found){setStatus('Nothing to capture yet — draw with Apple Pencil first.');return}minX=Math.max(0,minX-24);minY=Math.max(0,minY-24);maxX=Math.min(W,maxX+24);maxY=Math.min(H,maxY+24);const tw=maxX-minX,th=maxY-minY,tmp=document.createElement('canvas');tmp.width=tw;tmp.height=th;tmp.getContext('2d').drawImage(drawLayer,minX,minY,tw,th,0,0,tw,th);addMotif(tmp.toDataURL('image/png'),'Motif '+(motifs.length+1),true);dctx.clearRect(0,0,W,H);pushHist();redraw();setStatus('✂️ Captured drawing as Motif '+motifs.length+' and cleared drawing layer.');}
-function addMotif(src,name,placeNow=false){const img=new Image();img.onload=()=>{const idx=motifs.push({img,src,name})-1;if(placeNow){placed.push({id:crypto.randomUUID(),motifIndex:idx,img,x:W/2,y:H/2,w:Math.min(340,img.width),h:Math.min(340,img.height),s:1,r:0,fx:1,fy:1});selected=placed[placed.length-1].id;mode='edit';syncMode();}renderTray();pushHist();redraw();};img.src=src;}
-function renderTray(){const tray=$('motifTray');tray.innerHTML='';$('motifEmpty').style.display=motifs.length?'none':'block';motifs.forEach((m,i)=>{const card=document.createElement('div');card.className='motif-card';card.innerHTML=`<img src="${m.src}" alt=""><button class="x">×</button><div class="small">${m.name}</div>`;card.querySelector('img').onclick=()=>{placed.push({id:crypto.randomUUID(),motifIndex:i,img:m.img,x:W/2,y:H/2,w:Math.min(320,m.img.width),h:Math.min(320,m.img.height),s:1,r:0,fx:1,fy:1});selected=placed[placed.length-1].id;mode='edit';syncMode();pushHist();redraw();};card.querySelector('.x').onclick=()=>{motifs.splice(i,1);placed=placed.filter(p=>p.motifIndex!==i);renderTray();pushHist();redraw();};tray.appendChild(card);});}
+function addMotif(src,name,placeNow=false){const img=new Image();img.onload=()=>{const idx=motifs.push({img,src,name})-1;if(placeNow)placeMotif(idx,img);renderTray();pushHist();redraw();};img.src=src;}
+function renderTray(){const tray=$('motifTray');tray.innerHTML='';$('motifEmpty').style.display=motifs.length?'none':'block';motifs.forEach((m,i)=>{const card=document.createElement('div');card.className='motif-card';card.innerHTML=`<img src="${m.src}" alt=""><button class="x">×</button><div class="small">${m.name}</div>`;card.querySelector('img').onclick=()=>placeMotif(i,m.img);card.querySelector('.x').onclick=()=>{motifs.splice(i,1);placed=placed.filter(p=>p.motifIndex!==i);renderTray();pushHist();redraw();};tray.appendChild(card);});}
 function selectAt(x,y){const p=screenToCanvas(x,y);selected=null;for(let i=placed.length-1;i>=0;i--){const m=placed[i];if(Math.abs(p.x-m.x)<m.w*m.s/2&&Math.abs(p.y-m.y)<m.h*m.s/2){selected=m.id;break}}updateSelectedControls();redraw();}
 let dragMotif=null;canvas.addEventListener('pointerdown',e=>{if(mode!=='edit'||!isPen(e))return;selectAt(e.clientX,e.clientY);if(selected){const p=screenToCanvas(e.clientX,e.clientY),m=getSel();dragMotif={dx:p.x-m.x,dy:p.y-m.y};canvas.setPointerCapture(e.pointerId);}});
 canvas.addEventListener('pointermove',e=>{if(!dragMotif||mode!=='edit')return;const p=screenToCanvas(e.clientX,e.clientY),m=getSel();if(m){m.x=p.x-dragMotif.dx;m.y=p.y-dragMotif.dy;redraw();}});
 canvas.addEventListener('pointerup',()=>{if(dragMotif){dragMotif=null;pushHist();}});
 function getSel(){return placed.find(p=>p.id===selected)}
-function updateSymAxis(){const a=$('symAxis');if(!a)return;if(symMode==='off'){a.style.display='none';return}const rect=canvas.getBoundingClientRect();const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;const rr=rot*Math.PI/180;const px=(symX-W/2)*zoom,py=(symY-H/2)*zoom;a.style.display='block';a.style.left=(cx+px*Math.cos(rr)-py*Math.sin(rr))+'px';a.style.top=(cy+px*Math.sin(rr)+py*Math.cos(rr))+'px';}
-function updateSelectionBox(){const box=$('selectionBox'),m=getSel();if(!m){box.style.display='none';return}const rect=canvas.getBoundingClientRect();const cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;const a=rot*Math.PI/180;const px=(m.x-W/2)*zoom,py=(m.y-H/2)*zoom;const sx=cx+px*Math.cos(a)-py*Math.sin(a),sy=cy+px*Math.sin(a)+py*Math.cos(a);box.style.display='block';box.style.width=(m.w*m.s*zoom)+'px';box.style.height=(m.h*m.s*zoom)+'px';box.style.left=(sx-m.w*m.s*zoom/2)+'px';box.style.top=(sy-m.h*m.s*zoom/2)+'px';box.style.transform=`rotate(${rot+m.r}deg)`;}
+function updateSymAxis(){const a=$('symAxis');if(!a)return;if(symMode==='off'){a.style.display='none';return}const rect=canvas.getBoundingClientRect(),wrapRect=wrap.getBoundingClientRect();const cx=rect.left+rect.width/2-wrapRect.left,cy=rect.top+rect.height/2-wrapRect.top;const rr=rot*Math.PI/180;const px=(symX-W/2)*zoom,py=(symY-H/2)*zoom;a.style.display='block';a.style.left=(cx+px*Math.cos(rr)-py*Math.sin(rr))+'px';a.style.top=(cy+px*Math.sin(rr)+py*Math.cos(rr))+'px';}
+function updateSelectionBox(){const box=$('selectionBox'),m=getSel();if(!m){box.style.display='none';return}const rect=canvas.getBoundingClientRect(),wrapRect=wrap.getBoundingClientRect();const cx=rect.left+rect.width/2-wrapRect.left,cy=rect.top+rect.height/2-wrapRect.top;const a=rot*Math.PI/180;const px=(m.x-W/2)*zoom,py=(m.y-H/2)*zoom;const sx=cx+px*Math.cos(a)-py*Math.sin(a),sy=cy+px*Math.sin(a)+py*Math.cos(a);box.style.display='block';box.style.width=(m.w*m.s*zoom)+'px';box.style.height=(m.h*m.s*zoom)+'px';box.style.left=(sx-m.w*m.s*zoom/2)+'px';box.style.top=(sy-m.h*m.s*zoom/2)+'px';box.style.transform=`rotate(${rot+m.r}deg)`;}
 function updateSelectedControls(){const m=getSel();if(m){$('motifScale').value=Math.round(m.s*100);$('motifScaleVal').textContent=Math.round(m.s*100)+'%';}}
 function syncMode(){$('drawModeBtn').classList.toggle('active',mode==='draw');$('editModeBtn').classList.toggle('active',mode==='edit');canvas.style.cursor=mode==='draw'?'crosshair':'grab';setStatus(mode==='draw'?'✏️ Draw Mode: Apple Pencil draws, two fingers move the canvas.':'↔️ Edit Mode: tap motif with Pencil/mouse, then move, scale, rotate or flip.');}
 $('drawModeBtn').onclick=()=>{mode='draw';selected=null;syncMode();redraw()};$('editModeBtn').onclick=()=>{mode='edit';syncMode()};$('captureBtn').onclick=captureMotif;$('undoBtn').onclick=undo;$('redoBtn').onclick=redo;$('resetRot').onclick=()=>{rot=0;applyTransform()};$('clearDrawing').onclick=()=>{dctx.clearRect(0,0,W,H);pushHist();redraw()};
@@ -183,7 +253,7 @@ function syncSymToggle(){const btn=$('symToggle');btn.textContent=symMode==='off
 $('symToggle').onclick=()=>{$('symPopover').classList.toggle('open');};
 $('symClose').onclick=()=>{$('symPopover').classList.remove('open');};
 document.querySelectorAll('.sym-btn').forEach(b=>b.onclick=()=>{document.querySelectorAll('.sym-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');symMode=b.dataset.sym;syncSymToggle();updateSymAxis();redraw();setStatus(symMode==='off'?'🦋 Symmetry off.':'🦋 Symmetry '+b.textContent+' active — move the axis if you want it off-centre.');});$('symX').oninput=e=>{symX=+e.target.value;$('symXVal').textContent=Math.round(symX/W*100)+'%';updateSymAxis();redraw();};$('symY').oninput=e=>{symY=+e.target.value;$('symYVal').textContent=Math.round(symY/H*100)+'%';updateSymAxis();redraw();};$('symCentre').onclick=()=>{symX=W/2;symY=H/2;$('symX').value=symX;$('symY').value=symY;$('symXVal').textContent='50%';$('symYVal').textContent='50%';updateSymAxis();redraw();};
-$('exportBtn').onclick=()=>{const a=document.createElement('a');a.download='pattern-playground-tile.png';const out=document.createElement('canvas');out.width=TILE;out.height=TILE;const o=out.getContext('2d');o.fillStyle='#fff';o.fillRect(0,0,TILE,TILE);if(bgImg&&bgShown){o.save();o.globalAlpha=bgOpacity;o.drawImage(bgImg,0,0,TILE,TILE);o.restore();}o.drawImage(drawLayer,C,C,TILE,TILE,0,0,TILE,TILE);placed.forEach(p=>{o.save();o.translate(p.x-C,p.y-C);o.rotate(p.r*Math.PI/180);o.scale(p.s*p.fx,p.s*p.fy);o.drawImage(p.img,-p.w/2,-p.h/2,p.w,p.h);o.restore();});a.href=out.toDataURL('image/png');a.click();};
+$('exportBtn').onclick=()=>{const a=document.createElement('a');a.download='pattern-playground-tile.png';const out=document.createElement('canvas');out.width=TILE;out.height=TILE;const o=out.getContext('2d');o.fillStyle='#fff';o.fillRect(0,0,TILE,TILE);if(bgImg&&bgShown){o.save();o.globalAlpha=bgOpacity;o.drawImage(bgImg,0,0,TILE,TILE);o.restore();}o.drawImage(drawLayer,C,C,TILE,TILE,0,0,TILE,TILE);placed.forEach(p=>{if(!p.img)return;o.save();o.translate(p.x-C,p.y-C);o.rotate(p.r*Math.PI/180);o.scale(p.s*p.fx,p.s*p.fy);o.drawImage(p.img,-p.w/2,-p.h/2,p.w,p.h);o.restore();});a.href=out.toDataURL('image/png');a.click();};
 window.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.shiftKey?redo():undo();}});
 function syncThemeToggleUI(){const light=document.body.classList.contains('theme-light');$('themeToggle').textContent=light?'🌙 Dark Mode':'☀️ Light Mode';}
 $('themeToggle').onclick=()=>{const light=document.body.classList.toggle('theme-light');try{localStorage.setItem('pkmTheme',light?'light':'dark');}catch(e){}syncThemeToggleUI();};
